@@ -69,7 +69,7 @@ ENV PATH="$JAVA_HOME/bin:$PATH"
 # Alternatively copy in an installer that has been included image
 # (This will remove the wait time for downloading the installer during image creation)
 # Example syntax for copying in an embedded installer:
-COPY yellowfin-9.8.1.1-20221220-full.jar /tmp/yellowfin.jar
+COPY yellowfin-9.12.0.4-20240815-full.jar /tmp/yellowfin.jar
 
 #######################################################################################################
 # Perform filesystem installation
