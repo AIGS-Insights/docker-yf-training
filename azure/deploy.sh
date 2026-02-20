@@ -1,80 +1,10 @@
 #!/usr/bin/env bash
 set -euo pipefail
 
-# Deploy N public Azure Container Apps (${APP_NAME}1..N) with per-app Azure Files storage.
-#
-# What it does:
-#  - Loads ./.env if present.
-#  - Creates/uses a Log Analytics workspace.
-#  - Creates/updates a Container Apps environment wired to Log Analytics.
-#  - Creates/uses a Storage Account and creates one Azure File share per app.
-#  - Generates per-app YAMLs under ./generated/ and creates/updates the apps.
-#  - Writes resolved state to ./generated/.env (used by destroy.sh).
-
-if [[ -f "./.env" ]]; then
-  # shellcheck disable=SC1091
-  source ./.env
-  echo "==> Loaded .env"
-fi
-
-APP_NAME=${APP_NAME:-"yftraining"}
-CONTAINER_IMAGE=${CONTAINER_IMAGE:-"REPLACE_ME"}
-RESOURCE_GROUP=${RESOURCE_GROUP:-"${APP_NAME}-resource"}
-LOCATION=${LOCATION:-"centralus"}
-
-# Environment name (strict)
-ENVIRONMENT_NAME=${ENVIRONMENT_NAME:-"${APP_NAME}-environment"}
-
-CONTAINER_COUNT=${CONTAINER_COUNT:-10}
-LOGWORKSPACE_NAME=${LOGWORKSPACE_NAME:-"${APP_NAME}-logworkspace"}
-
-# Sizing
-CONTAINER_CPU=${CONTAINER_CPU:-2.0}
-CONTAINER_MEMORY=${CONTAINER_MEMORY:-"4Gi"}
-
-# Optional: provide an existing storage account name. If empty, one will be generated.
-STORAGE_ACCOUNT=${STORAGE_ACCOUNT:-""}
-
-# Registry credentials (optional for public images)
-REPO_USERNAME=${REPO_USERNAME:-""}
-REPO_PASSWORD=${REPO_PASSWORD:-""}
-
-TEMPLATE_FILE=${TEMPLATE_FILE:-"template/app.template.yaml"}
-GENERATED_DIR=${GENERATED_DIR:-"generated"}
-
-if [[ "$CONTAINER_IMAGE" == "REPLACE_ME" ]]; then
-  echo "ERROR: Set CONTAINER_IMAGE (in .env or env var) to an image that listens on port 8080." >&2
-  exit 1
-fi
-
-if ! [[ "$CONTAINER_COUNT" =~ ^[0-9]+$ ]] || [[ "$CONTAINER_COUNT" -lt 1 ]]; then
-  echo "ERROR: CONTAINER_COUNT must be a positive integer." >&2
-  exit 1
-fi
-
-if [[ ! -f "$TEMPLATE_FILE" ]]; then
-  echo "ERROR: Template YAML not found: $TEMPLATE_FILE" >&2
-  exit 1
-fi
-
-# Normalize Docker Hub shorthand (user/repo:tag) -> docker.io/user/repo:tag
-if [[ "$CONTAINER_IMAGE" != */* ]]; then
-  echo "ERROR: CONTAINER_IMAGE must include at least <repo>/<image>:<tag>" >&2
-  exit 1
-fi
-if [[ "$CONTAINER_IMAGE" != *"."*"/"* ]] && [[ "$CONTAINER_IMAGE" != docker.io/* ]] && [[ "$CONTAINER_IMAGE" != *.azurecr.io/* ]]; then
-  CONTAINER_IMAGE="docker.io/${CONTAINER_IMAGE}"
-fi
-
-# Determine registry server from image
-CONTAINER_REPO=""
-if [[ "$CONTAINER_IMAGE" == *.azurecr.io/* ]]; then
-  CONTAINER_REPO=$(echo "$CONTAINER_IMAGE" | cut -d/ -f1)
-elif [[ "$CONTAINER_IMAGE" == docker.io/* ]]; then
-  CONTAINER_REPO="docker.io"
-else
-  CONTAINER_REPO=$(echo "$CONTAINER_IMAGE" | cut -d/ -f1)
-fi
+# Deploy N public Azure Container Apps (${CONTAINER_NAME}1..N) with per-app Azure Files storage.
+# Load environment and defaults from _init.sh in script directory
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+source "$SCRIPT_DIR/_init.sh"
 
 # Providers
 az provider register --namespace Microsoft.App --wait >/dev/null
@@ -118,7 +48,7 @@ import random, string
 print(''.join(random.choice(string.ascii_lowercase+string.digits) for _ in range(8)))
 PY
 )
-  SAN_APP=$(echo "$APP_NAME" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9')
+  SAN_APP=$(echo "$CONTAINER_NAME" | tr '[:upper:]' '[:lower:]' | tr -cd 'a-z0-9')
   STORAGE_ACCOUNT="${SAN_APP}storage${RAND}"
   STORAGE_ACCOUNT=${STORAGE_ACCOUNT:0:24}
 fi
@@ -144,7 +74,7 @@ escape_sed_replacement() {
 # Persist state in generated/.env
 cat > "${GENERATED_DIR}/.env" <<EOF
 # Generated/updated by deploy.sh
-APP_NAME="${APP_NAME}"
+CONTAINER_NAME="${CONTAINER_NAME}"
 RESOURCE_GROUP="${RESOURCE_GROUP}"
 LOCATION="${LOCATION}"
 ENVIRONMENT_NAME="${ENVIRONMENT_NAME}"
@@ -164,9 +94,9 @@ EOF
 echo "==> Wrote environment file: ./${GENERATED_DIR}/.env"
 
 for i in $(seq 1 "$CONTAINER_COUNT"); do
-  CONTAINER_NAME="${APP_NAME}${i}"
-  FILE_SHARE="${CONTAINER_NAME}-fileshare"
-  STORAGE_LINK="${CONTAINER_NAME}-storage"
+  CONTAINER_INSTANCE="${CONTAINER_NAME}${i}"
+  FILE_SHARE="${CONTAINER_INSTANCE}-fileshare"
+  STORAGE_LINK="${CONTAINER_INSTANCE}-storage"
 
   echo "==> Ensuring file share exists: $FILE_SHARE"
   az storage share-rm create -g "$RESOURCE_GROUP" --storage-account "$STORAGE_ACCOUNT" \
@@ -181,9 +111,9 @@ for i in $(seq 1 "$CONTAINER_COUNT"); do
     --name "$ENVIRONMENT_NAME" \
     --resource-group "$RESOURCE_GROUP" -o none
 
-  YAML_FILE="${GENERATED_DIR}/${CONTAINER_NAME}.yaml"
+  YAML_FILE="${GENERATED_DIR}/${CONTAINER_INSTANCE}.yaml"
 
-  CN_ESC=$(escape_sed_replacement "$CONTAINER_NAME")
+  CN_ESC=$(escape_sed_replacement "$CONTAINER_INSTANCE")
   LOC_ESC=$(escape_sed_replacement "$LOCATION")
   EID_ESC=$(escape_sed_replacement "$ENVIRONMENT_ID")
   IMG_ESC=$(escape_sed_replacement "$CONTAINER_IMAGE")
@@ -195,7 +125,7 @@ for i in $(seq 1 "$CONTAINER_COUNT"); do
   RP_ESC=$(escape_sed_replacement "$REPO_PASSWORD")
 
   sed \
-    -e "s|__CONTAINER_NAME__|${CN_ESC}|g" \
+    -e "s|__CONTAINER_INSTANCE__|${CN_ESC}|g" \
     -e "s|__LOCATION__|${LOC_ESC}|g" \
     -e "s|__ENVIRONMENT_ID__|${EID_ESC}|g" \
     -e "s|__CONTAINER_IMAGE__|${IMG_ESC}|g" \
@@ -207,12 +137,12 @@ for i in $(seq 1 "$CONTAINER_COUNT"); do
     -e "s|__REPO_PASSWORD__|${RP_ESC}|g" \
     "$TEMPLATE_FILE" > "$YAML_FILE"
 
-  if az containerapp show -g "$RESOURCE_GROUP" -n "$CONTAINER_NAME" >/dev/null 2>&1; then
-    echo "==> Updating app: $CONTAINER_NAME"
-    az containerapp update -g "$RESOURCE_GROUP" -n "$CONTAINER_NAME" --yaml "$YAML_FILE" -o none
+  if az containerapp show -g "$RESOURCE_GROUP" -n "$CONTAINER_INSTANCE" >/dev/null 2>&1; then
+    echo "==> Updating app: $CONTAINER_INSTANCE"
+    az containerapp update -g "$RESOURCE_GROUP" -n "$CONTAINER_INSTANCE" --yaml "$YAML_FILE" -o none
   else
-    echo "==> Creating app: $CONTAINER_NAME"
-    az containerapp create -g "$RESOURCE_GROUP" -n "$CONTAINER_NAME" --yaml "$YAML_FILE" -o none
+    echo "==> Creating app: $CONTAINER_INSTANCE"
+    az containerapp create -g "$RESOURCE_GROUP" -n "$CONTAINER_INSTANCE" --yaml "$YAML_FILE" -o none
   fi
 
 done
