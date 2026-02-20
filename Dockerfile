@@ -36,8 +36,11 @@
 
 # From Ubuntu 20 base image
 FROM ubuntu:20.04
+
+ARG APP_VERSION
+ARG APP_BUILD
 LABEL maintainer="AIGS Support <support@aigs.co.za>"
-LABEL description="AIGS Insights Training"
+LABEL description="AIGS Insights Training ${APP_VERSION}"
 
 # Timezone setup
 ENV TZ=Africa/Johannesburg
@@ -69,7 +72,7 @@ ENV PATH="$JAVA_HOME/bin:$PATH"
 # Alternatively copy in an installer that has been included image
 # (This will remove the wait time for downloading the installer during image creation)
 # Example syntax for copying in an embedded installer:
-COPY assets/yellowfin-9.16.1-20251013-full.jar /tmp/yellowfin.jar
+COPY assets/yellowfin-${APP_VERSION}-${APP_BUILD}-full.jar /tmp/yellowfin.jar
 
 #######################################################################################################
 # Perform filesystem installation
@@ -90,9 +93,9 @@ RUN unzip /tmp/yellowfin.jar -d /tmp/yftemp && unzip /tmp/yftemp/yfres/yellowfin
 RUN chmod +x /opt/yellowfin/appserver/bin/catalina.sh /opt/yellowfin/appserver/bin/startup.sh /opt/yellowfin/appserver/bin/shutdown.sh
 
 # Perform training extraction
-COPY assets/training-configdb.zip /tmp/training-configdb.zip
+COPY assets/training-configdb-${APP_VERSION}.zip /tmp/training-configdb.zip
 RUN unzip -o /tmp/training-configdb.zip -d /opt/yellowfin/
-COPY assets/training-tutorialdata.zip /tmp/training-tutorialdata.zip
+COPY assets/training-tutorialdata-${APP_VERSION}.zip /tmp/training-tutorialdata.zip
 RUN unzip -o /tmp/training-tutorialdata.zip -d /opt/yellowfin/
 
 ENV JDBC_CLASS_NAME=org.hsqldb.jdbcDriver
@@ -109,9 +112,9 @@ ENV APP_MEMORY=4096
 # Modify Yellowfin's configuration based on parameters passed to the docker container.
 #######################################################################################################
 
-COPY assets/perform_docker_configuration.sh /opt/yellowfin/appserver/bin
-RUN chmod +x /opt/yellowfin/appserver/bin/perform_docker_configuration.sh
-RUN sed -i 's/exec "$PRGDIR"\/"$EXECUTABLE" start "$@"/\/opt\/yellowfin\/appserver\/bin\/perform_docker_configuration.sh\nexec "$PRGDIR"\/"$EXECUTABLE" run "$@"/g' /opt/yellowfin/appserver/bin/startup.sh
+COPY assets/docker_configuration.sh /opt/yellowfin/appserver/bin
+RUN chmod +x /opt/yellowfin/appserver/bin/docker_configuration.sh
+RUN sed -i 's/exec "$PRGDIR"\/"$EXECUTABLE" start "$@"/\/opt\/yellowfin\/appserver\/bin\/docker_configuration.sh\nexec "$PRGDIR"\/"$EXECUTABLE" run "$@"/g' /opt/yellowfin/appserver/bin/startup.sh
 
 #######################################################################################################
 # Installation Customization

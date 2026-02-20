@@ -8,8 +8,8 @@ set -euo pipefail
 #
 # Options:
 #   --yes            Skip interactive prompt.
-#   --keep-rg        Do NOT delete the resource group. Instead deletes contained resources best-effort.
-#   --keep-storage   When used with --keep-rg, keeps the persistent storage (storage account + file shares).
+#   --keep-resource        Do NOT delete the resource group. Instead deletes contained resources best-effort.
+#   --keep-storage   When used with --keep-resource, keeps the persistent storage (storage account + file shares).
 #   --env-file X     Use a specific env file (default: ./generated/.env then ./.env).
 
 YES=false
@@ -20,25 +20,25 @@ ENV_FILE=""
 while [[ $# -gt 0 ]]; do
   case "$1" in
     --yes) YES=true; shift ;;
-    --keep-rg) KEEP_RG=true; shift ;;
-    --keep-storage) KEEP_STORAGE=true; shift ;;
+    --keep-resource) KEEP_RG=true; shift ;;
+    --keep-storage) KEEP_STORAGE=true; KEEP_RG=true; shift ;;
     --env-file) ENV_FILE="$2"; shift 2 ;;
     -h|--help)
       cat <<'EOF'
-Usage: ./destroy.sh [--yes] [--keep-rg] [--keep-storage] [--env-file PATH]
+Usage: ./destroy.sh [--yes] [--keep-resource] [--keep-storage] [--env-file PATH]
 
 Reads state from ./generated/.env (preferred) or ./.env and removes created Azure resources.
 
 Modes:
   Default: delete the resource group (everything is removed).
-  --keep-rg: best-effort delete resources inside the RG.
-  --keep-rg --keep-storage: keep the storage account + file shares, delete everything else.
+  --keep-resource: best-effort delete resources inside the RG.
+  --keep-resource --keep-storage: keep the storage account + file shares, delete everything else.
 
 Examples:
   ./destroy.sh
   ./destroy.sh --yes
-  ./destroy.sh --keep-rg --yes
-  ./destroy.sh --keep-rg --keep-storage --yes
+  ./destroy.sh --keep-resource --yes
+  ./destroy.sh --keep-resource --keep-storage --yes
 EOF
       exit 0
       ;;
@@ -49,39 +49,21 @@ EOF
   esac
 done
 
-if [[ "$KEEP_STORAGE" == true && "$KEEP_RG" != true ]]; then
-  echo "ERROR: --keep-storage requires --keep-rg (storage cannot be kept if the whole resource group is deleted)." >&2
-  exit 2
-fi
+# Load environment and defaults from _init.sh in script directory
+SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
+source "$SCRIPT_DIR/_init.sh"
 
 # Load state
-if [[ -n "$ENV_FILE" ]]; then
-  if [[ ! -f "$ENV_FILE" ]]; then
-    echo "ERROR: Env file not found: $ENV_FILE" >&2
-    exit 1
-  fi
-  # shellcheck disable=SC1090
+if [[ -f "$ENV_FILE" ]]; then
   source "$ENV_FILE"
   echo "==> Loaded env file: $ENV_FILE"
-elif [[ -f "./generated/.env" ]]; then
-  # shellcheck disable=SC1091
-  source ./generated/.env
-  echo "==> Loaded env file: ./generated/.env"
-elif [[ -f "./.env" ]]; then
-  # shellcheck disable=SC1091
-  source ./.env
-  echo "==> Loaded env file: ./.env"
+elif [[ -f "$SCRIPT_DIR/generated/.env" ]]; then
+  source "$SCRIPT_DIR/generated/.env"
+  echo "==> Loaded env file: $SCRIPT_DIR/generated/.env"
 else
   echo "ERROR: No env file found. Expected ./generated/.env or ./.env" >&2
   exit 1
 fi
-
-APP_NAME=${APP_NAME:-"yf-training"}
-RESOURCE_GROUP=${RESOURCE_GROUP:-""}
-ENVIRONMENT_NAME=${ENVIRONMENT_NAME:-""}
-CONTAINER_COUNT=${CONTAINER_COUNT:-""}
-STORAGE_ACCOUNT=${STORAGE_ACCOUNT:-""}
-LOGWORKSPACE_NAME=${LOGWORKSPACE_NAME:-"${APP_NAME}-logworkspace"}
 
 if [[ -z "$RESOURCE_GROUP" ]]; then
   echo "ERROR: RESOURCE_GROUP is required in the env file." >&2
@@ -102,9 +84,9 @@ if [[ "$YES" != true ]]; then
   echo "About to destroy Azure resources in resource group: $RESOURCE_GROUP"
   if [[ "$KEEP_RG" == true ]]; then
     if [[ "$KEEP_STORAGE" == true ]]; then
-      echo "Mode: keep-rg + keep-storage (apps/env/logs removed; storage is preserved)"
+      echo "Mode: keep-resource + keep-storage (apps/env/logs removed; storage is preserved)"
     else
-      echo "Mode: keep-rg (best-effort delete resources inside the RG)"
+      echo "Mode: keep-resource (best-effort delete resources inside the RG)"
     fi
   else
     echo "Mode: delete resource group (recommended)"
@@ -126,10 +108,10 @@ fi
 # Best-effort delete within the RG.
 # Delete apps
 if [[ -n "$CONTAINER_COUNT" ]] && [[ "$CONTAINER_COUNT" =~ ^[0-9]+$ ]]; then
-  APPS=$(for i in $(seq 1 "$CONTAINER_COUNT"); do echo "${APP_NAME}${i}"; done)
+  APPS=$(for i in $(seq 1 "$CONTAINER_COUNT"); do echo "${CONTAINER_NAME}${i}"; done)
 else
-  echo "==> CONTAINER_COUNT not set; discovering apps by prefix '${APP_NAME}'"
-  APPS=$(az containerapp list -g "$RESOURCE_GROUP" --query "[?starts_with(name, '${APP_NAME}')].name" -o tsv 2>/dev/null || true)
+  echo "==> CONTAINER_COUNT not set; discovering apps by prefix '${CONTAINER_NAME}'"
+  APPS=$(az containerapp list -g "$RESOURCE_GROUP" --query "[?starts_with(name, '${CONTAINER_NAME}')].name" -o tsv 2>/dev/null || true)
 fi
 
 for app in $APPS; do

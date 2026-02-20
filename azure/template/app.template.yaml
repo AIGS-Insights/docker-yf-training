@@ -1,8 +1,8 @@
 # Template for Azure Container App
 # Tokens replaced by deploy script:
-#   __CONTAINER_NAME__ __LOCATION__ __ENVIRONMENT_ID__ __CONTAINER_IMAGE__ __STORAGE_LINK__ __CONTAINER_CPU__ __CONTAINER_MEMORY__
+#   __CONTAINER_INSTANCE__ __LOCATION__ __ENVIRONMENT_ID__ __CONTAINER_IMAGE__ __STORAGE_LINK__ __CONTAINER_CPU__ __CONTAINER_MEMORY__
 
-name: __CONTAINER_NAME__
+name: __CONTAINER_INSTANCE__
 type: Microsoft.App/containerApps
 location: __LOCATION__
 properties:
@@ -23,7 +23,7 @@ properties:
         passwordSecretRef: repo-password
   template:
     containers:
-      - name: __CONTAINER_NAME__
+      - name: __CONTAINER_INSTANCE__
         image: __CONTAINER_IMAGE__
         resources:
           cpu: __CONTAINER_CPU__
