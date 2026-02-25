@@ -1,3 +1,9 @@
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    --latest) REPO_TAG="latest"; shift ;;
+  esac
+done
+
 source "$(dirname "$0")/_init.sh"
 
 echo "Tagging Docker image ${CONTAINER_NAME}:${CONTAINER_TAG} as ${CONTAINER_REPO}/${CONTAINER_NAME}:${REPO_TAG:-${CONTAINER_TAG}}..."

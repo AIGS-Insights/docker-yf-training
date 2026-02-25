@@ -27,8 +27,9 @@ STORAGE_ACCOUNT="${STORAGE_ACCOUNT:-}" # Optional
 REPO_USERNAME="${REPO_USERNAME:-}" # Optional
 REPO_PASSWORD="${REPO_PASSWORD:-}" # Optional
 
-TEMPLATE_FILE=${TEMPLATE_FILE:-"$SCRIPT_DIR/template/app.template.yaml"}
-GENERATED_DIR=${GENERATED_DIR:-"$SCRIPT_DIR/generated"}
+TEMPLATE_FILE=${TEMPLATE_FILE:-"$SCRIPT_DIR/template/azure.template.yaml"}
+GENERATED_DIR=${GENERATED_DIR:-"$SCRIPT_DIR/../generated"}
+mkdir -p "$GENERATED_DIR"
 
 if [[ "$CONTAINER_IMAGE" == "REPLACE_ME" ]]; then
   echo "ERROR: Set CONTAINER_IMAGE (in .env or env var)." >&2

@@ -1,0 +1,9 @@
+# Template for Docker Container
+
+name: __CONTAINER_GROUP__
+services:
+  __CONTAINER_NAME__:
+    image: __CONTAINER_IMAGE__:__CONTAINER_TAG__
+    container_name: __CONTAINER_NAME__
+    ports:
+      - __HOST_PORT__:8080

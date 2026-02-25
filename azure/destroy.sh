@@ -50,16 +50,15 @@ EOF
 done
 
 # Load environment and defaults from _init.sh in script directory
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
-source "$SCRIPT_DIR/_init.sh"
+source "$(dirname "$0")/_init.sh"
 
 # Load state
 if [[ -f "$ENV_FILE" ]]; then
   source "$ENV_FILE"
   echo "==> Loaded env file: $ENV_FILE"
-elif [[ -f "$SCRIPT_DIR/generated/.env" ]]; then
-  source "$SCRIPT_DIR/generated/.env"
-  echo "==> Loaded env file: $SCRIPT_DIR/generated/.env"
+elif [[ -f "$GENERATED_DIR/azure.env" ]]; then
+  source "$GENERATED_DIR/azure.env"
+  echo "==> Loaded env file: $GENERATED_DIR/azure.env"
 else
   echo "ERROR: No env file found. Expected ./generated/.env or ./.env" >&2
   exit 1
