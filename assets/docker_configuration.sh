@@ -1,4 +1,3 @@
-
 #!/bin/sh
 
 COMPLETION_FILE=/opt/yellowfin/appserver/bin/docker_configuration_done
