@@ -1,6 +1,4 @@
 # Template for Azure Container App
-# Tokens replaced by deploy script:
-#   __CONTAINER_INSTANCE__ __LOCATION__ __ENVIRONMENT_ID__ __CONTAINER_IMAGE__ __STORAGE_LINK__ __CONTAINER_CPU__ __CONTAINER_MEMORY__
 
 name: __CONTAINER_INSTANCE__
 type: Microsoft.App/containerApps

@@ -1,5 +1,5 @@
 yellowfin-*.jar
 zulu11.*.tar.gz
 training-configdb*.zip
-.env
-/azure/generated/*
+*.env
+/generated/*

@@ -3,8 +3,7 @@ set -euo pipefail
 
 # Deploy N public Azure Container Apps (${CONTAINER_NAME}1..N) with per-app Azure Files storage.
 # Load environment and defaults from _init.sh in script directory
-SCRIPT_DIR="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")" &> /dev/null && pwd)"
-source "$SCRIPT_DIR/_init.sh"
+source "$(dirname "$0")/_init.sh"
 
 # Providers
 az provider register --namespace Microsoft.App --wait >/dev/null
@@ -71,8 +70,8 @@ escape_sed_replacement() {
   printf "%s" "$1" | sed -e "s/[\\\\&|]/\\\\&/g"
 }
 
-# Persist state in generated/.env
-cat > "${GENERATED_DIR}/.env" <<EOF
+# Persist state in generated/azure.env
+cat > "${GENERATED_DIR}/azure.env" <<EOF
 # Generated/updated by deploy.sh
 CONTAINER_NAME="${CONTAINER_NAME}"
 RESOURCE_GROUP="${RESOURCE_GROUP}"
@@ -91,7 +90,7 @@ TEMPLATE_FILE="${TEMPLATE_FILE}"
 GENERATED_DIR="${GENERATED_DIR}"
 EOF
 
-echo "==> Wrote environment file: ./${GENERATED_DIR}/.env"
+echo "==> Wrote environment file: ./${GENERATED_DIR}/azure.env"
 
 for i in $(seq 1 "$CONTAINER_COUNT"); do
   CONTAINER_INSTANCE="${CONTAINER_NAME}${i}"
